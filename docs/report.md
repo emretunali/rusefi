@@ -576,3 +576,91 @@ Open follow-ups:
   picks up this change.
 - Optional future hardening: same-evaluated-unit check for expressions
   once an expression evaluator with ini context is available.
+
+## 2026-08-27 - Spark EMS "Amiral" project bootstrap on the rusEFI fork
+
+What was done:
+- Created the Amiral board definition at firmware/config/boards/spark-ems/amiral/,
+  seeded from firmware/config/boards/hellen/alphax-8chan (F7 variant only) and then
+  maintained independently. F7-only board.mk with an explicit $(error) on any other
+  PROJECT_CPU, HW_SPARK_EMS_AMIRAL=1 product define alongside the inherited
+  HW_HELLEN_8CHAN=1, meta-info-amiral.env (SHORT_BOARD_NAME=amiral, OpenBLT on),
+  compile_amiral.sh / compile_amiral_bundle.sh, prepend.txt + prepend_amiral.txt,
+  connector YAMLs renamed 8chan-* -> amiral-*, and a board readme documenting every
+  deliberate deviation from the seed.
+- Built the upstream sync infrastructure: tools/spark-ems/sync-upstream.sh (tag
+  selection, upstream remote bootstrap with fetch retry/backoff, sync branch creation,
+  seed-board diffstat, --no-commit merge) and tools/spark-ems/migrate-to-private-repo.sh
+  for the fork -> private repo mirror.
+- Added four agents under .claude/agents/ (upstream-sync, board-bringup, hw-validation,
+  release-manager) and a /sync-upstream skill.
+- Wrote docs/spark-ems/ (README, repository-setup, upstream-sync, agents, branding,
+  roadmap) and folded the durable findings below into CLAUDE.md.
+- Added .github/workflows/amiral-firmware.yaml and amiral-unit-tests.yaml - Amiral only,
+  instead of upstream's all-boards fan-out.
+
+Key decisions and why:
+
+| Decision | Why |
+|---|---|
+| New board dir spark-ems/amiral, not an edit of alphax-8chan | Upstream changes to the seed board can no longer conflict with ours; the cost is that seed fixes must be ported by hand, which the sync script surfaces as a diffstat |
+| F7 only | Single product SKU; the F4 variant exists upstream only to squeeze into smaller flash |
+| Sync against dated tags, not upstream/master | Every sync lands on a commit upstream CI already built, and gives a recordable name for rollback |
+| Keep the TS signature white label as "rusEFI" | See below - changing it breaks the stock console |
+| Left CLAUDE.md's "only a human commits or pushes" rule intact | Relaxing it for claude/* and sync/* branches is defensible in ephemeral remote containers, but it is a policy call for the human; recorded as an open question in docs/spark-ems/roadmap.md |
+
+Non-obvious findings (folded into CLAUDE.md):
+- rusEFI's dated snapshot tags are named YYYY-MM-DD with NO 'v' prefix. An initial
+  'v20*-*-*' glob matched only 6 stale 2023 tags and silently looked like upstream had
+  stopped tagging. The real set is 1252 tags, current to today.
+- Comments in config .txt inputs (prepend.txt and friends) must start with '!' or '//'.
+  ToolUtil.isEmptyDefinitionLine accepts nothing else, so a ';' comment throws
+  IllegalStateException: Unexpected line while prepending. The .ini fragments in the
+  same board directory do use ';' - two conventions, one folder.
+- gen_config_board.sh standalone needs tunerstudio/generated/signature_<board>.txt to
+  already exist (the Makefile path runs gen_signature.sh; a direct invocation does not)
+  and needs a JDK 11 toolchain because the root build.gradle pins
+  JavaLanguageVersion.of(11). With only JDK 21 present, gradle fails and then fails
+  again trying to fetch a JDK from foojay through a proxy.
+- common_script_read_meta_env.inc exports EVERY KEY=VALUE line of a meta-info env into
+  the build, not just the documented keys - that is the supported board-scoped build
+  variable channel (e.g. signature_white_label).
+- White-labelling the TS signature is coupled to the console: SignatureHelper.PREFIX is
+  a hardcoded "rusEFI " and PROTOCOL_SIGNATURE_PREFIX lives in the shared
+  integration/ts_protocol.txt. A non-"rusEFI " signature makes parse() return null and
+  breaks ini lookup. hellen/uaefi121/shared_io.resources/shared_io.properties is the
+  precedent for the console-side half.
+- set8chanDefaultETBPins must keep its name in a board derived from alphax-8chan:
+  config/engines/gm_sbc.cpp forward-declares and calls it across translation units.
+  Renaming it with the other alphax_8chan_* symbols would have broken the link.
+- Bug found by testing, in our own script: 'git tag --list ... | head -1' under
+  'set -o pipefail' dies with status 141 - head closes the pipe and git takes SIGPIPE.
+  Replaced with a variable plus ${VAR%%$'\n'*}.
+
+Validation:
+- firmware/gen_config_board.sh config/boards/spark-ems/amiral amiral -> "Happy amiral!".
+  Produced rusefi_amiral.ini (815 KB) carrying the board-specific boardUseTempPullUp
+  field and signature "rusEFI <branch>.2026.08.27.amiral.764070289".
+- PinoutLogic regenerated connectors/generated_* from the renamed YAMLs; the only diff
+  versus the seed is the source-path comment, confirming the pin content is intact.
+- sync-upstream.sh exercised end to end in a throwaway git worktree against tag
+  2026-08-27: remote bootstrap, tag pick, branch creation, diffstat, clean merge,
+  exit 0. Worktree and test branch removed afterwards.
+- Both workflow YAMLs parse; step interfaces checked against the upstream workflows
+  they were modelled on (check_illegal_conversion.sh takes no argument and greps
+  build/rusefi.list - an initial version passed it an .elf path).
+- unit_tests/test.sh: 1196 tests across 236 suites, all PASSED (26.3 s). Note the first
+  invocation in a fresh container fails with "unit_test_rules.mk:272: multiple target
+  patterns" - that is the makefile's own "please run make again" path after it checks
+  out googletest and the other submodules, not a real failure. Second run is clean.
+- Amiral firmware was NOT cross-compiled: no arm-none-eabi-gcc in this container.
+  That gate is the amiral-firmware.yaml workflow's job on first push.
+
+Open follow-ups:
+- The private repo does not exist yet - GitHub cannot make a fork private, so the
+  mirror script is waiting on an empty private repo being created by hand.
+- Connector YAMLs still describe AlphaX-8chan hardware, not the final Amiral PCB.
+  Everything downstream of them is provisional until the schematic is frozen.
+- MAIN_HELP_URL and BOARD_SERIAL are placeholders.
+- The weekly sync Routine is not armed yet; arming it before the repo migration would
+  point it at the fork being abandoned.

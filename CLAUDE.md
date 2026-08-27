@@ -6,6 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 rusEFI is an open-source engine control unit firmware for STM32 microcontrollers.
 
+### This fork: Spark EMS "Amiral"
+
+This repository is **not** upstream rusEFI. It is the Spark EMS product fork; the ECU
+product is called **Amiral**. Read `docs/spark-ems/README.md` first - it explains the
+branch model, the upstream sync, and the four project agents (`.claude/agents/`).
+
+The governing rule: **keep Spark EMS code out of shared upstream files.** Every line
+added to a shared rusEFI file becomes a merge conflict on every future upstream sync.
+Our code belongs in `firmware/config/boards/spark-ems/`, `docs/spark-ems/`,
+`tools/spark-ems/`, `.claude/`, and `.github/workflows/amiral-*.yaml`. rusEFI provides
+board override hooks, `prepend.txt`, `board_config.txt` and `board_*.ini` fragments
+precisely so a board never has to edit shared code - use them.
+
+Upstream is tracked by **dated snapshot tags named `YYYY-MM-DD`** (no `v` prefix, ~daily,
+1250+ of them). rusEFI publishes no semantic releases; the `release_N` / `N.N.N_release`
+tags in old history do not track master. The last synced tag lives in
+`.spark-ems-upstream-tag`; `tools/spark-ems/sync-upstream.sh` does the merge.
+
+`firmware/config/boards/spark-ems/amiral/` is a **copy** of `hellen/alphax-8chan`, not a
+reference to it - upstream seed-board fixes never arrive via merge and must be ported by
+hand. The sync script prints the diffstat of exactly those paths.
+
+Board notes worth knowing before editing Amiral:
+- `set8chanDefaultETBPins` in `board_configuration.cpp` must keep that name:
+  `firmware/config/engines/gm_sbc.cpp` forward-declares and calls it across translation units.
+- Amiral is F7-only. `trigger_scope_config.h` was dropped because `TRIGGER_SCOPE` is
+  only ever defined on the F4 variant.
+- `connectors/generated_*` are regenerated from `connectors/*.yaml` by `rusefi_config.mk`;
+  they are the one family of generated files upstream does track in git.
+
 ## Session reporting & knowledge capture
 
 After each completed unit of work (a landed feature, a fixed bug, or a finished investigation), and at minimum once per working session:
@@ -144,6 +174,47 @@ For detailed technical documentation intended for AI assistants, see:
 - **ChibiOS RTOS**: Real-time operating system foundation
 - **Config validate vs fix separation**: `validateConfigOnStartUpOrBurn()` is read-only validation; ALL configuration mutation on startup/burn belongs in `applyDefaultsOrFixAfterBurn()` (returns true if it changed anything). Board-specific fixes go in the `custom_board_fix_configuration` override (same changed-flag contract); `custom_board_validateConfig` must never mutate config.
 - **Engine modules**: Engine-asynchronous control logic derives from `EngineModule` and registers in the `type_list` in `firmware/controllers/algo/engine.h`. Before creating a module or making one compile-time optional, search the codebase for `[tag:disable_engine_module]` and read those comments — they document the module lifecycle and the TS-page guard-flag rules (a module that owns a TunerStudio page must have its `EFI_*` flag declared in the board `prepend.txt`, never in `board.mk` or `efifeatures.h`).
+
+#### Running the config generator standalone (non-obvious prerequisites)
+
+`firmware/gen_config_board.sh <board-dir> <short-name>` is the fastest way to check
+that a board definition is well-formed - it needs no ARM toolchain and ends in
+`Happy <short-name>!`. Three things trip it up:
+
+- **It needs a JDK 11 toolchain, not just any JDK.** The root `build.gradle` pins
+  `JavaLanguageVersion.of(11)` (tagged `[tag:java8]`). On a machine with only JDK 21,
+  `./gradlew :config_definition:shadowJar` fails with "Cannot find a Java installation
+  ... matching languageVersion=11" and then tries to download one from foojay, which
+  fails again behind a proxy. Install JDK 11 rather than editing `build.gradle` - that
+  file is shared upstream. `--no-configuration-cache` also avoids an unrelated
+  configuration-cache serialization failure on the `javaCompiler` property.
+- **It needs `tunerstudio/generated/signature_<short-name>.txt` to already exist.**
+  The Makefile path generates it via `gen_signature.sh`; a standalone run does not.
+  Run `bash firmware/gen_signature.sh <short-name>` first, or the generator throws
+  `FileNotFoundException` on the signature file.
+- **Comments in config `.txt` inputs are `!` or `//`, never `;` or a bare `#`.**
+  `ToolUtil.isEmptyDefinitionLine` accepts only those two; anything else that is not a
+  `#define` raises `IllegalStateException: Unexpected line while prepending`. This
+  applies to `prepend.txt`, `prepend_<board>.txt` and friends - note that the `.ini`
+  fragments in the same directory *do* use `;`, so the two conventions sit side by side
+  in one board folder.
+
+#### Build-time environment from `meta-info-*.env`
+
+`config/boards/common_script_read_meta_env.inc` `export`s **every** `KEY=VALUE` line in
+a board's meta-info file into the build environment, not just the documented
+`SHORT_BOARD_NAME` / `PROJECT_CPU` / `USE_OPENBLT` keys. That is the supported way to
+feed a board-scoped variable to the build scripts - e.g. `signature_white_label`, which
+`gen_signature.sh` reads to replace the `rusEFI` prefix in `TS_SIGNATURE`.
+
+Changing that prefix is **not** free: `SignatureHelper.PREFIX` in
+`java_console/shared_io` is a hardcoded `"rusEFI "` (with a `todo` to reference
+`Fields.PROTOCOL_SIGNATURE_PREFIX`), and `PROTOCOL_SIGNATURE_PREFIX` itself is defined
+in the shared `firmware/integration/ts_protocol.txt`. A signature not starting with
+`rusEFI ` makes `SignatureHelper.parse()` return null, breaking ini lookup and the
+wizard catalog. White-labelling therefore requires shipping a matching console build;
+`firmware/config/boards/hellen/uaefi121/shared_io.resources/shared_io.properties` is the
+existing precedent for the console-side half.
 
 #### Generated configuration layout
 

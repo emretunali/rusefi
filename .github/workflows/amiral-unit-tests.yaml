@@ -1,0 +1,59 @@
+#
+# Spark EMS Amiral - unit tests
+#
+# Linux GCC and Clang. Upstream also runs macOS and Windows; those catch real
+# portability breaks in unit-test code, but cost roughly 3x the minutes. Clang here
+# covers the warning set GCC silently accepts (and vice versa), which is where most
+# of the value is. Add the other platforms back if we start seeing portability breaks.
+#
+name: Amiral Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'claude/**'
+      - 'sync/**'
+      - 'release/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Checkout Submodules Without ChibiOS
+      run: misc/git_scripts/common_submodule_init_without_chibios.sh
+
+    - uses: ./.github/actions/setup-java
+
+    - name: Install build tools
+      run: |
+        sudo bash misc/actions/add-ubuntu-latest-apt-mirrors.sh
+        sudo bash misc/actions/ubuntu-install-tools.sh
+
+    - name: Print compiler version
+      run: ${{ matrix.compiler }} -v
+
+    - name: Generate configs
+      working-directory: ./unit_tests/
+      run: |
+        make -j4 docs-enums
+        make -j4 config
+
+    - name: Build tests
+      working-directory: ./unit_tests/
+      run: make -j4 CC=${{ matrix.compiler }}
+
+    - name: Run tests
+      working-directory: ./unit_tests/
+      run: ASAN_OPTIONS=detect_stack_use_after_return=1 build/rusefi_test

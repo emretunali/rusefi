@@ -1,0 +1,8 @@
+// Spark EMS Amiral - STM32F7 specific sizing (2MB flash budget)
+
+#define LUA_SCRIPT_SIZE 40000
+
+#define FLOW_LINEARIZATION_MASS_SIZE 16
+#define FLOW_LINEARIZATION_PRESSURE_SIZE 16
+
+#define VBAT_INJECTOR_CURVE_PRESSURE_SIZE 4

@@ -1,0 +1,90 @@
+#
+# Spark EMS Amiral - firmware build
+#
+# Deliberately narrow: upstream's build-firmware.yaml fans out over every board in the
+# tree, which costs Actions minutes for boards we do not have. This builds Amiral only.
+#
+name: Amiral Firmware
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'claude/**'
+      - 'sync/**'
+      - 'release/**'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  BOARD_META_PATH: config/boards/spark-ems/amiral/meta-info-amiral.env
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Checkout Submodules
+      run: misc/git_scripts/common_submodule_init.sh
+
+    - uses: ./.github/actions/setup-java
+
+    - name: Install build tools
+      run: |
+        sudo bash misc/actions/add-ubuntu-latest-apt-mirrors.sh
+        sudo bash misc/actions/ubuntu-install-tools.sh
+
+    - name: Set build env variables
+      env:
+        # ref names may contain shell metacharacters - never interpolate them into scripts with ${{ }}
+        REF_NAME: ${{ github.ref_name }}
+      run: |
+        echo "AUTOMATION_REF=$REF_NAME" >> $GITHUB_ENV
+
+    - name: Acquire Arm GNU Toolchain (arm-none-eabi-gcc)
+      uses: carlosperate/arm-none-eabi-gcc-action@v1.13.0
+      with:
+        release: '14.2.Rel1'
+
+    - name: Test arm-none-eabi-gcc
+      run: arm-none-eabi-gcc -v
+
+    - name: Generate configs
+      working-directory: ./firmware/
+      run: |
+        bash bin/compile.sh ${{env.BOARD_META_PATH}} docs-enums
+        bash bin/compile.sh ${{env.BOARD_META_PATH}} config
+
+    - name: Build Amiral firmware
+      working-directory: ./firmware/
+      run: bash bin/compile.sh ${{env.BOARD_META_PATH}}
+
+    # bin/compile.sh has been observed to exit 0 even when the underlying make failed,
+    # so assert the artifacts actually exist rather than trusting the exit code.
+    - name: Assert build artifacts exist
+      working-directory: ./firmware/
+      run: |
+        set -eu
+        test -f build/rusefi.elf || { echo "::error::build/rusefi.elf missing - the build did not complete"; exit 1; }
+        test -f build/rusefi.list || { echo "::error::build/rusefi.list missing - the next step greps it"; exit 1; }
+        ls -la build/rusefi.elf build/rusefi.list
+        arm-none-eabi-size build/rusefi.elf
+
+    # CI gate inherited from upstream: a float->int64 conversion in the image pulls in
+    # __aeabi_f2lz and silently costs precision on tick arithmetic.
+    # The script takes no arguments - it greps build/rusefi.list relative to ./firmware/.
+    - name: Check for illegal float conversions
+      working-directory: ./firmware/
+      run: bash check_illegal_conversion.sh
+
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: amiral-firmware
+        path: |
+          firmware/deliver/*
+          firmware/build/rusefi.elf
+        if-no-files-found: warn

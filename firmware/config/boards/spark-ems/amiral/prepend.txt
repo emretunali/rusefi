@@ -1,0 +1,36 @@
+// Spark EMS Amiral - board-level TunerStudio / config overrides
+//
+// Keep Amiral-specific overrides HERE rather than editing shared rusEFI files:
+// every line moved into firmware/integration/*.txt becomes an upstream merge conflict.
+
+#define MAIN_HELP_URL "https://sparkems.com/amiral"
+
+#define ts_show_vbatt false
+#define ts_show_clt_iat_pullup false
+#define ts_show_basic_configurations true
+#define ts_show_egt false
+#define ts_show_etb_pins false
+#define ts_show_analog_divider false
+#define ts_show_spi false
+#define ts_show_can_pins false
+#define ts_show_tunerstudio_port true
+#define ts_show_check_engine true
+#define ts_show_InjectorFlowLinearizationTable true
+
+#define ts_show_software_knock true
+#define ts_show_vr_threshold_all true
+#define ts_show_vr_threshold_pins false
+#define ts_show_vr_threshold_2 true
+#define ts_show_tcu true
+#define ts_show_tps_sent true
+#define ts_show_gdi true
+#define ts_show_gdi_low_level false
+#define ts_show_analog_diag true
+
+#define CLT_IDLE_TABLE_CLT_SIZE 6
+#define CLT_IDLE_TABLE_RPM_SIZE 4
+
+#define VR_THRESHOLD_COUNT 3
+
+!                                             1                                        5
+#define canReWidebandHwIndex_enum "INVALID", "First", "INVALID", "INVALID", "INVALID", "Second", "INVALID", "INVALID", "INVALID", "INVALID", "INVALID", "INVALID", "INVALID", "INVALID", "INVALID", "INVALID"
