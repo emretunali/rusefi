@@ -116,6 +116,21 @@ arm-none-eabi-gcc --version | head -1
 java -version 2>&1 | head -1
 ASUSER
 
+# --- Claude Code CLI (optional but this is the point of the box) --------------
+# A Claude Code web session CANNOT reach this server: the sandbox filters outbound
+# SSH and its proxy denies the host outright. The way to have Claude work here is to
+# run Claude Code ON this machine.
+if command -v claude >/dev/null 2>&1; then
+	echo "==> Claude Code already installed"
+else
+	echo "==> installing Claude Code CLI"
+	if curl -fsSL https://claude.ai/install.sh | bash; then
+		echo "    installed"
+	else
+		echo "    WARNING: Claude Code install failed - install it by hand later"
+	fi
+fi
+
 cat <<EOF
 
 ==============================================================
@@ -142,6 +157,15 @@ box once the repo is private, because Actions minutes are metered there:
     Note: a self-hosted runner executes whatever a workflow says, so only enable it
     for this private repo - never for a public repo that accepts outside PRs.
 
-Optional - run Claude Code here for persistent sessions:
-    tmux new -s amiral      # so the session survives your SSH disconnecting
+Run Claude Code HERE - this is the whole point of the box:
+    su - $BUILD_USER
+    tmux new -s amiral          # so the session survives your SSH disconnecting
+    cd $REPO_DIR && claude
+
+    Or from VS Code: Remote-SSH into this host, open $REPO_DIR, and use the
+    Claude Code extension. Same result, nicer editor.
+
+    Either way the session is persistent, the toolchain is the pinned 14.2.rel1
+    that CI uses, the build cache stays warm, and an ECU plugged into this machine
+    is reachable (the build user is in the dialout group).
 EOF

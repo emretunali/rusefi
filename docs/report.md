@@ -808,3 +808,45 @@ Open follow-ups:
 - The weekly sync Routine still cannot be armed usefully from this session: a scheduled
   fresh session inherits THIS session's environment, whose source is emretunali/rusefi,
   not the private repo. It needs to be armed from a session sourced on sparkems-amiral.
+
+## 2026-08-27 - A web session cannot reach the build server (measured, not assumed)
+
+What was done:
+- Tested every plausible egress path from a Claude Code web session to a real VDS,
+  with controls to rule out false positives.
+- Wrote the result into docs/spark-ems/build-environment.md and taught
+  provision-build-server.sh to install the Claude Code CLI, since running Claude ON the
+  server is the actual answer.
+
+Findings:
+
+| Path | Result | Meaning |
+|---|---|---|
+| TCP/22 to the host | rc=124, timeout | filtered by sandbox egress policy |
+| TCP/80 and /443 to the host | TCP connects | looked open - but see below |
+| HTTP GET to the host:80 | `403`, `x-deny-reason: host_not_allowed` | the sandbox PROXY answered, not the host |
+| TCP/22, /80, /443 to 192.0.2.1 (TEST-NET control) | connection refused | the test itself is honest |
+| TCP/8099 on the host (unused-port control) | refused | ditto |
+
+The 80/443 "open" reading was a false positive that the first control did not catch:
+the proxy terminates those ports for every host, so the TCP handshake always succeeds
+and the denial only shows up at the HTTP layer. The decisive evidence is the
+`x-deny-reason: host_not_allowed` header.
+
+Consequence: **moving sshd to 443 would not help** - the proxy rejects the host, not the
+port. No permission or setting available to the agent changes this.
+
+Key decisions and why:
+- Rather than report "cannot do it", made the two workable paths first-class:
+  (A) run Claude Code on the server - provision-build-server.sh now installs the CLI and
+  the closing instructions cover tmux and VS Code Remote-SSH;
+  (B) self-hosted Actions runner, which lets a web session dispatch real builds onto
+  that hardware and read the logs through the GitHub API.
+
+Validation:
+- The egress measurements above are direct observations from this session.
+- provision-build-server.sh passes bash -n. Still NOT executed against a real server -
+  unchanged from the earlier entry, and now doubly so since this session cannot reach one.
+
+Open follow-ups:
+- Unchanged. The weekly sync Routine still needs a session sourced on sparkems-amiral.

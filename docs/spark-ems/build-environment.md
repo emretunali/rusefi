@@ -84,6 +84,31 @@ A **cloud** VDS cannot do hardware-in-the-loop - there is no USB path to the ECU
 needs a machine physically wired to the board; upstream's `hardware-ci.yaml` and
 `.github/workflows/hw-ci/` show the shape of that setup.
 
+### A web session cannot reach your server
+
+Measured 2026-08-27 against a real host, so do not spend time retrying it:
+
+| Path | Result |
+|---|---|
+| Outbound TCP/22 | timeout - filtered by the sandbox egress policy |
+| Outbound TCP/80, 443 | TCP connects, but the **sandbox proxy** answers, not your host: `HTTP 403`, `x-deny-reason: host_not_allowed` |
+
+Moving sshd to port 443 does **not** help: the proxy rejects the host, not the port.
+No permission setting changes this - it is egress policy, enforced outside the agent.
+
+So there are exactly two ways to have Claude work on that machine:
+
+**A. Run Claude Code on the server.** `provision-build-server.sh` installs the CLI.
+Then `tmux new -s amiral && cd <repo> && claude`, or VS Code Remote-SSH into the host
+and use the Claude Code extension. Full interactive control, persistent session, pinned
+toolchain, warm cache, and USB access to an attached ECU.
+
+**B. Self-hosted GitHub Actions runner.** Register the server as a runner, point the
+Amiral workflows at `runs-on: self-hosted`, and a web session can then dispatch
+workflows and read their logs through the GitHub API. Not a shell, but real builds
+executed on your hardware, driven from a web session. Only ever enable this on the
+private repo - a self-hosted runner executes whatever a workflow says.
+
 ## Reference size
 
 Amiral F7, arm-none-eabi-gcc 13.2.1, 2026-08-27, plain `compile_amiral.sh`:
