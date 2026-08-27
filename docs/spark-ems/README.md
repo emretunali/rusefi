@@ -16,6 +16,7 @@ Spark EMS product ECU built on the rusEFI firmware base.
 
 | Document | What it covers |
 |---|---|
+| [`build-environment.md`](build-environment.md) | Where Amiral gets built, and which environment's numbers you can trust |
 | [`repository-setup.md`](repository-setup.md) | Private repo migration, remotes, branch model |
 | [`upstream-sync.md`](upstream-sync.md) | How the periodic rusEFI sync works and what it will not do for you |
 | [`agents.md`](agents.md) | The four project agents and when to use which |

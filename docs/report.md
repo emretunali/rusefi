@@ -680,3 +680,44 @@ Validation: none needed - documentation and policy only, no code paths touched.
 
 Open follow-ups: unchanged from the entry above. The private repo remains the one
 blocking item; everything else waits on either that or the frozen Amiral schematic.
+
+## 2026-08-27 - Amiral firmware cross-compile closed out; build environments mapped
+
+What was done:
+- Closed the one validation gap left by the bootstrap entry: the Amiral F7 firmware was
+  actually cross-compiled, in this managed container, after installing the toolchain by
+  hand. Clean build, and check_illegal_conversion.sh passes (no __aeabi_f2lz).
+- Wrote docs/spark-ems/build-environment.md describing the three build environments and
+  which one's numbers can be trusted.
+
+Findings:
+- rusEFI's own firmware/setup_linux_environment.sh installs exactly what was missing
+  (JDK 11 + the pinned toolchain), but its provide_gcc.sh step CANNOT run in a Claude
+  Code managed container: it fetches from rusefi/build_support, and the session proxy
+  returns 403 for any GitHub repo outside the session owner. add_repo refuses it as a
+  cross-owner add. The container therefore gets Ubuntu's arm-none-eabi-gcc 13.2.1
+  instead of CI's pinned 14.2.rel1.
+- Practical consequence: container builds catch compile/link errors and the float
+  conversion gate, but are NOT authoritative for flash-size comparison or for
+  version-specific compiler warnings.
+- Missing 7z fails late and misleadingly: compilation completes, then create_ini_image.sh
+  dies with "ERROR: create_ini_image.sh failed with 136". Fixed by
+  misc/actions/ubuntu-install-tools.sh.
+- The board's MAIN_HELP_URL propagated correctly through the image step
+  (BOARD_SPECIFIC_URL=[https://sparkems.com/amiral]), confirming the board config is
+  wired into the generated ini and the ramdisk image.
+
+Validation:
+- firmware/config/boards/spark-ems/amiral/compile_amiral.sh -> exit 0.
+  text 431168 / rodata 239112 / data 1096 / bss 120654 (gcc 13.2.1 - off-toolchain,
+  rough baseline only).
+- check_illegal_conversion.sh -> PASS.
+- Not run: bundle build (compile_amiral_bundle.sh), which is what produces
+  firmware/deliver/. Plain compile does not create that directory.
+
+Open follow-ups:
+- Unchanged: private repo migration, connector YAMLs vs the real PCB.
+- A dedicated Linux box would get the pinned 14.2.rel1 toolchain in one command and
+  could host a self-hosted Actions runner - relevant once the repo is private and
+  Actions minutes are metered. A cloud VDS cannot do hardware-in-the-loop; that needs a
+  machine physically wired to the ECU.

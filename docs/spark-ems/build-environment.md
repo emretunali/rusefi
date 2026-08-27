@@ -1,0 +1,70 @@
+# Build environments
+
+Three places Amiral gets built, with different capabilities. Know which one you are in
+before trusting a number that comes out of it.
+
+## 1. Claude Code managed container (this repo's web sessions)
+
+Ephemeral. Nothing survives session end, so the toolchain has to be installed each time
+and anything worth keeping must be committed and pushed.
+
+Full firmware builds **do** work here. Verified 2026-08-27: a clean Amiral F7 build
+completed and passed `check_illegal_conversion.sh`. Setup, roughly 4 minutes:
+
+```bash
+apt-get install -y openjdk-11-jdk-headless          # gradle toolchain pin, see CLAUDE.md
+apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
+bash misc/actions/ubuntu-install-tools.sh           # 7z, mtools, dosfstools, colordiff, ...
+```
+
+Two constraints that are not obvious:
+
+- **`firmware/setup_linux_environment.sh` / `provide_gcc.sh` do NOT work here.** They
+  fetch the pinned toolchain from `rusefi/build_support`, and the session proxy returns
+  403 for any GitHub repo outside the session's own owner. `add_repo` refuses the add
+  as a cross-owner request. So the managed container gets **Ubuntu's arm-none-eabi-gcc
+  13.2.1**, not the **14.2.rel1** that CI and `provide_gcc.sh` pin.
+- Consequence: builds here are good for catching compile and link errors, and for the
+  float->int64 gate. They are **not** authoritative for flash-size comparisons or for
+  compiler-version-specific warnings. Compare sizes only between builds from the same
+  toolchain.
+- `7z` missing shows up late and cryptically: the build gets all the way through
+  compilation and then dies in `create_ini_image.sh` with `ERROR: create_ini_image.sh
+  failed with 136`. That is a missing package, not a code problem.
+
+## 2. GitHub Actions (`amiral-firmware.yaml`, `amiral-unit-tests.yaml`)
+
+The authoritative gate. Pinned `arm-none-eabi-gcc` 14.2.Rel1 via
+`carlosperate/arm-none-eabi-gcc-action`. This is what decides whether a change is
+actually good.
+
+Note that Actions minutes are metered on private repositories. An Amiral firmware build
+plus a two-compiler unit-test matrix on every push is not free once this repo moves.
+
+## 3. A dedicated Linux box (VDS, workstation, or bench machine)
+
+```bash
+bash firmware/setup_linux_environment.sh   # JDK 11 + pinned 14.2.rel1 toolchain + tools
+```
+
+This is the only environment that gets the pinned toolchain with one command, keeps a
+warm build cache between runs, and can host a self-hosted GitHub Actions runner.
+
+A **cloud** VDS cannot do hardware-in-the-loop - there is no USB path to the ECU. HIL
+needs a machine physically wired to the board; upstream's `hardware-ci.yaml` and
+`.github/workflows/hw-ci/` show the shape of that setup.
+
+## Reference size
+
+Amiral F7, arm-none-eabi-gcc 13.2.1, 2026-08-27, plain `compile_amiral.sh`:
+
+| Section | Bytes |
+|---|---|
+| text | 431168 |
+| rodata | 239112 |
+| data | 1096 |
+| bss | 120654 |
+
+Treat this as a rough baseline only - it is off-toolchain. Also remember that the first
+build after a `make clean` or `.dep` wipe measures several KB larger than an identical
+follow-up build, so compare consecutive rebuilds, never a single post-wipe build.
