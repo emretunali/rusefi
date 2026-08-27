@@ -4,6 +4,10 @@ Ordered by what blocks what. Status as of the initial project setup, 2026-08-27.
 
 ## Done
 
+- [x] **Private repo created and mirrored**: `emretunali/sparkems-amiral`, private, not
+      a fork, default branch `main` (43192 commits). Upstream tags deliberately left
+      behind - see `repository-setup.md`.
+
 - [x] Amiral board definition `firmware/config/boards/spark-ems/amiral/` (F7, seeded
       from AlphaX-8chan), validated through config generation (`Happy amiral!`)
 - [x] Upstream sync tooling and the dated-tag model, tested end to end
@@ -13,15 +17,13 @@ Ordered by what blocks what. Status as of the initial project setup, 2026-08-27.
 
 ## Blocked on a human action
 
-- [ ] **Create the private repo and mirror into it.** GitHub cannot make a fork
-      private. `tools/spark-ems/migrate-to-private-repo.sh` does the push; the empty
-      private repo has to be created by hand first. Everything else can proceed in
-      the meantime, but Amiral-specific work is public until this lands.
-- [ ] Rename `master` to `main` during the migration. Decided: the product branch is
-      `main`, which is what `sync-upstream.sh` already defaults to, so
-      `SPARK_EMS_MAIN_BRANCH` never needs to be set.
 - [ ] Turn off the upstream CI workflows we do not need in the private repo's Actions
       settings.
+- [ ] **Disable Dependabot** in the private repo's Settings -> Code security. rusEFI's
+      inherited `.github/dependabot.yml` runs daily and already opened branches. Do it in
+      settings, not by deleting the file - that file is upstream's.
+- [ ] Repoint `origin` to the private repo in every working clone, and stop pushing
+      Amiral work to the old public fork.
 - [ ] Arm the weekly upstream sync Routine. Decided: **after** the migration - arming
       it now would produce weekly reports against the fork being abandoned.
 
