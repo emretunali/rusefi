@@ -24,15 +24,13 @@ tried to hold all four would carry three irrelevant contexts on every task.
 
 From `CLAUDE.md`, and they are not optional:
 
-- **Commit and push policy is currently upstream rusEFI's:** only a human commits or
-  pushes, on any branch. Agents leave work in the tree and report.
+- **Commit and push on working branches only.** Agents may commit and push `claude/*`
+  and `sync/*`. `main` and `release/*` are human-only - never commit to them, never push
+  to them, never merge into them. Never open a pull request unless asked.
 
-  This sits awkwardly with remote sessions, which run in ephemeral containers where an
-  uncommitted tree is lost when the container is reclaimed. The open question is whether
-  to relax the rule for `claude/*` and `sync/*` working branches while keeping `main`
-  and `release/*` human-only. **Not decided - see `roadmap.md`.** Until it is, agents
-  follow the upstream rule except where a session's own instructions explicitly direct
-  a push to a named working branch.
+  The relaxation exists because remote sessions run in ephemeral containers: an
+  uncommitted tree is lost when the container is reclaimed. It does not extend to the
+  branch that ships.
 - Stage new source files with `git add` as you create them, so nothing is lost.
 - Never commit generated files. The one exception is `connectors/generated_*`, which
   upstream tracks in git for every board.

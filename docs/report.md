@@ -664,3 +664,19 @@ Open follow-ups:
 - MAIN_HELP_URL and BOARD_SERIAL are placeholders.
 - The weekly sync Routine is not armed yet; arming it before the repo migration would
   point it at the fork being abandoned.
+
+## 2026-08-27 - Spark EMS: process decisions recorded
+
+Decisions taken after the bootstrap above, all now reflected in CLAUDE.md and
+docs/spark-ems/:
+
+| Question | Decision | Consequence |
+|---|---|---|
+| Agent commit/push scope | claude/* and sync/* only; main and release/* human-only; no unasked PRs | CLAUDE.md "Source Control Hygiene" relaxed from upstream's blanket ban, because remote sessions run in ephemeral containers where an uncommitted tree is simply lost |
+| Weekly sync Routine | Arm it AFTER the private-repo migration | Arming it now would produce weekly reports against the fork being abandoned |
+| Product branch name | main (master renamed during migration) | sync-upstream.sh already defaults to main, so SPARK_EMS_MAIN_BRANCH never needs setting; migrate-to-private-repo.sh now prints the rename steps |
+
+Validation: none needed - documentation and policy only, no code paths touched.
+
+Open follow-ups: unchanged from the entry above. The private repo remains the one
+blocking item; everything else waits on either that or the frozen Amiral schematic.

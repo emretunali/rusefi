@@ -267,7 +267,10 @@ Any code reachable from a unit-test build (`unit_tests/` itself, plus firmware s
 
 ## Source Control Hygiene
 
-- **Never commit or push — only a human does either.** Both `git commit` and `git push` (to any remote, any branch) are reserved for the human. Leave changes uncommitted in the working tree and summarize what changed; the human commits and pushes.
+- **Branch-scoped commit policy (Spark EMS fork).** Upstream rusEFI's rule is that only a human ever commits or pushes. This fork relaxes it for working branches only, because remote sessions run in ephemeral containers where an uncommitted tree is lost when the container is reclaimed:
+  - `claude/*` and `sync/*` working branches: agents may `git commit` and `git push -u origin <branch>`. Commit messages state what changed and why, and say plainly which validation ran and which did not.
+  - `main`, `master`, `release/*`: **human only.** Never commit to them, never push to them, never merge into them. Hand over a working branch and report.
+  - Never open a pull request unless explicitly asked.
 - **Stage new files immediately**: When you create a new source file (C/C++ headers/sources, Java/Kotlin sources, unit tests, scripts, build files, resources, docs, etc.), run `git add <path>` as part of the same change so it shows up in `git status` / `git diff` and is not lost on the next clean or branch switch.
 - Do not stage build artifacts or generated files (see "Do not attempt to commit any generated files" above), IDE-local files, or user-specific configs.
 

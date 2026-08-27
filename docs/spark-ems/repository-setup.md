@@ -40,6 +40,13 @@ release/amiral-vX.Y    frozen shippable builds
 claude/<topic>         agent working branches
 ```
 
+The product branch is **`main`** - `master` is renamed during the migration.
+`sync-upstream.sh` defaults to `main`, so `SPARK_EMS_MAIN_BRANCH` should never need to
+be set.
+
+Agents may commit and push `claude/*` and `sync/*`. `main` and `release/*` are
+human-only. See `agents.md`.
+
 `.spark-ems-upstream-tag` at the repo root records the last upstream tag merged into
 `main`. `sync-upstream.sh` reads it to compute what is new and writes it on a clean
 merge. It is the sync bookkeeping - keep it committed and accurate.

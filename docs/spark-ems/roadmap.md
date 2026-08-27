@@ -17,10 +17,13 @@ Ordered by what blocks what. Status as of the initial project setup, 2026-08-27.
       private. `tools/spark-ems/migrate-to-private-repo.sh` does the push; the empty
       private repo has to be created by hand first. Everything else can proceed in
       the meantime, but Amiral-specific work is public until this lands.
-- [ ] Decide the branch name (`main` vs `master`) for the private repo and set
-      `SPARK_EMS_MAIN_BRANCH` accordingly, or rename to `main`.
+- [ ] Rename `master` to `main` during the migration. Decided: the product branch is
+      `main`, which is what `sync-upstream.sh` already defaults to, so
+      `SPARK_EMS_MAIN_BRANCH` never needs to be set.
 - [ ] Turn off the upstream CI workflows we do not need in the private repo's Actions
       settings.
+- [ ] Arm the weekly upstream sync Routine. Decided: **after** the migration - arming
+      it now would produce weekly reports against the fork being abandoned.
 
 ## Blocked on hardware
 
@@ -50,12 +53,6 @@ Ordered by what blocks what. Status as of the initial project setup, 2026-08-27.
       third party. Settle how that is satisfied (written offer, source with the
       product, public repo of the shipped revision) before first shipment, not after.
 - [ ] Whether to keep the old public fork at all.
-- [ ] **Agent commit/push policy.** `CLAUDE.md` inherits upstream's "only a human ever
-      commits or pushes, on any branch". Remote sessions run in ephemeral containers,
-      so an uncommitted tree is lost when the container is reclaimed. Proposal: allow
-      agents to commit and push `claude/*` and `sync/*` working branches, keep `main`,
-      `master` and `release/*` human-only, and never open a PR unasked. Needs an
-      explicit decision before it is written into `CLAUDE.md`.
 
 ## Later
 

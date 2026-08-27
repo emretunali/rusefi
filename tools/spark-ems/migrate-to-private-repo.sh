@@ -52,8 +52,13 @@ Mirror complete.
 
 Post-migration checklist:
   1. Confirm on GitHub that the new repo is Private and has all branches/tags.
-  2. In your working clone, repoint origin:
+  2. In your working clone, repoint origin and rename the product branch to 'main'
+     (sync-upstream.sh defaults to 'main'; anything else needs SPARK_EMS_MAIN_BRANCH):
        git remote set-url origin $TARGET_URL
+       git branch -m master main
+       git push -u origin main
+     Then set 'main' as the default branch in the GitHub repo settings and delete the
+     old 'master' ref: git push origin --delete master
   3. Add the upstream remote for syncing (sync-upstream.sh does this too):
        git remote add upstream https://github.com/rusefi/rusefi
   4. Re-enable the Actions workflows you actually want; upstream ships ~30 of
