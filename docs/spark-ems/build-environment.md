@@ -17,6 +17,22 @@ apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-e
 bash misc/actions/ubuntu-install-tools.sh           # 7z, mtools, dosfstools, colordiff, ...
 ```
 
+`.claude/hooks/session-start.sh` automates exactly this. It is **not registered by
+default** - registering a SessionStart hook lets the harness auto-run a script at every
+session start, so that is the repo owner's call. To enable it, add to `.claude/settings.json`:
+
+```json
+"hooks": {
+  "SessionStart": [
+    { "hooks": [ { "type": "command",
+                   "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" } ] }
+  ]
+}
+```
+
+The hook is idempotent and best-effort: it skips anything already installed and logs a
+warning rather than failing the session if an install does not work.
+
 Two constraints that are not obvious:
 
 - **`firmware/setup_linux_environment.sh` / `provide_gcc.sh` do NOT work here.** They
@@ -42,6 +58,20 @@ Note that Actions minutes are metered on private repositories. An Amiral firmwar
 plus a two-compiler unit-test matrix on every push is not free once this repo moves.
 
 ## 3. A dedicated Linux box (VDS, workstation, or bench machine)
+
+For a bare Ubuntu 24.04 box, `tools/spark-ems/provision-build-server.sh` does the whole
+thing - packages, JDK 11, the pinned toolchain, an unprivileged build user, ccache, and
+the repo clone with submodules:
+
+```bash
+# as root on the server
+bash provision-build-server.sh git@github.com:<owner>/<private-repo>.git
+```
+
+It prints a hardening checklist first and refuses to proceed until you acknowledge it -
+a build server holds your source and, once it runs a CI runner, your repo credentials.
+
+On an existing developer machine, rusEFI's own script is enough:
 
 ```bash
 bash firmware/setup_linux_environment.sh   # JDK 11 + pinned 14.2.rel1 toolchain + tools

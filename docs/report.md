@@ -721,3 +721,49 @@ Open follow-ups:
   could host a self-hosted Actions runner - relevant once the repo is private and
   Actions minutes are metered. A cloud VDS cannot do hardware-in-the-loop; that needs a
   machine physically wired to the ECU.
+
+## 2026-08-27 - Build server provisioning and web-session toolchain hook
+
+What was done:
+- tools/spark-ems/provision-build-server.sh: turns a bare Ubuntu 24.04 box into an
+  Amiral build server - packages, JDK 11, the PINNED arm-none-eabi 14.2.rel1 toolchain
+  via provide_gcc.sh, an unprivileged build user in the dialout group, ccache, repo
+  clone with submodules. Prints a hardening checklist and requires acknowledgement
+  before proceeding, then documents the self-hosted Actions runner setup.
+- .claude/hooks/session-start.sh: installs the toolchain in a Claude Code web session
+  so firmware can be compiled there. Idempotent, best-effort, web-only (guarded on
+  CLAUDE_CODE_REMOTE).
+- docs/spark-ems/build-environment.md wired both in.
+
+Key decisions and why:
+- The hook is deliberately NOT registered in .claude/settings.json. Registering a
+  SessionStart hook grants the harness permission to auto-run a script at every session
+  start; that belongs to the repo owner, not to an agent. The doc carries the exact
+  snippet to paste.
+- provision-build-server.sh does not perform hardening itself - it refuses to run until
+  the operator confirms they have read the checklist. Silently opening firewall rules or
+  rewriting sshd_config on someone's server is not an agent's call.
+- The provisioning script uses provide_gcc.sh (pinned 14.2.rel1) while the session hook
+  uses the distro 13.2.x, because only the former environment can reach
+  rusefi/build_support.
+
+Validation:
+- Both scripts pass bash -n.
+- The session hook could NOT be executed end to end here - running it was blocked. What
+  was verified instead: all four of its "already installed" guards evaluate correctly
+  against the state built by hand earlier in this session (JDK 11, arm-none-eabi-gcc
+  13.2.1, 7z+mtools, submodules), so the skip paths are correct; and its install
+  commands are verbatim the ones that succeeded earlier in this session.
+- provision-build-server.sh has NOT been run against a real server - outbound SSH is
+  blocked from this session (TCP/22 unreachable, the proxy is HTTPS-only), so it is
+  unexercised code. Treat the first run on the server as the test.
+
+Open follow-ups:
+- The private repository still does not exist. mcp__github__create_repository returns
+  403 "Resource not accessible by integration" - the GitHub App has no repo-creation
+  permission, so the empty private repo must be created by hand before the mirror can
+  run.
+- Noted while reading the GitHub profile: the account's company is "Spark EFI" and its
+  site is sparkefi.net, while the product docs here use "Spark EMS" and the placeholder
+  MAIN_HELP_URL points at sparkems.com. Worth confirming which brand is correct before
+  the URL and any branding work is finalised.
