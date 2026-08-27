@@ -767,3 +767,44 @@ Open follow-ups:
   site is sparkefi.net, while the product docs here use "Spark EMS" and the placeholder
   MAIN_HELP_URL points at sparkems.com. Worth confirming which brand is correct before
   the URL and any branding work is finalised.
+
+## 2026-08-27 - Migration to the private repository
+
+What was done:
+- Mirrored the work into emretunali/sparkems-amiral: private, NOT a fork, default
+  branch main. Verified via the API: private=true, fork=false, default_branch=main.
+- main = 43192 commits, head edc97f9eb2a, byte-identical to local master.
+  claude/spark-ems-admiral-ecu-l23ckd pushed and verified identical.
+- Upstream's 1370 tags deliberately NOT mirrored.
+
+Two problems hit and how they were solved:
+
+| Problem | Diagnosis | Fix |
+|---|---|---|
+| First push died with `RPC failed; curl 18 transfer closed with outstanding read data remaining` | A single ~2 GB pack cannot survive the session proxy | Pushed history in 21 slices of 2000 commits, each an incremental push on the previous, then a final full push. Zero retries needed once chunked. |
+| The working clone was SHALLOW - master had only 50 commits, cut at 2026-08-22 | The session clones shallow by default; `git rev-list --count --all` said 68465 only because the upstream tag fetch had deepened other refs | `git fetch --unshallow origin` before pushing. Pushing first would have put a truncated history in the new repo permanently. |
+
+Key decisions and why:
+- **Upstream tags not mirrored.** They would add 24109 commits that are not on our
+  history plus 1252 dated snapshot tags burying our own amiral-vX.Y releases. Nothing
+  needs them locally: sync-upstream.sh adds the upstream remote and fetches tags from
+  there. Accepted consequence: the tag named in .spark-ems-upstream-tag does not resolve
+  in a fresh clone until upstream has been fetched once, which the sync script does.
+- **Dependabot left enabled but flagged, not disabled by editing the file.** rusEFI ships
+  .github/dependabot.yml on a daily github-actions schedule; it activated within minutes
+  of the mirror and opened three branches. Deleting that file would edit an upstream file
+  and conflict on every future sync, so the fix belongs in repo Settings -> Code security.
+
+Validation:
+- git ls-remote against the private repo: main and the work branch both match local
+  SHAs exactly.
+- API confirms private=true, fork=false.
+- NOT verified: that CI runs green in the new repo - no workflow has executed there yet.
+
+Open follow-ups:
+- Disable Dependabot and prune the unwanted inherited workflows in the private repo.
+- Repoint origin in working clones; this container still has origin=emretunali/rusefi
+  with the private repo as a second remote named `sparkems`.
+- The weekly sync Routine still cannot be armed usefully from this session: a scheduled
+  fresh session inherits THIS session's environment, whose source is emretunali/rusefi,
+  not the private repo. It needs to be armed from a session sourced on sparkems-amiral.

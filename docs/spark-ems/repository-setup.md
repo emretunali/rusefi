@@ -19,6 +19,46 @@ the one-click "Sync fork" button. Neither is a loss, because upstream tracking i
 by `tools/spark-ems/sync-upstream.sh` against dated tags, which is more precise than
 following `master`.
 
+## What was actually mirrored
+
+Done 2026-08-27 into `emretunali/sparkems-amiral` (private, not a fork, default branch
+`main`):
+
+| Ref | Result |
+|---|---|
+| `master` -> `main` | 43192 commits, full history, head `edc97f9eb2a` |
+| `claude/spark-ems-admiral-ecu-l23ckd` | the Amiral bootstrap work |
+| upstream's 1370 tags | **deliberately NOT mirrored** |
+
+Two things are worth knowing about how that went:
+
+- **The push had to be chunked.** A single pack of that size dies through the session
+  proxy with `RPC failed; curl 18 transfer closed with outstanding read data remaining`.
+  Pushing history in ~2000-commit slices, each an incremental push on the last, works
+  first time. If you ever re-mirror, do it that way rather than fighting one big push.
+- **The source clone was shallow** (50 commits) and had to be `git fetch --unshallow`ed
+  first. Pushing from a shallow clone would have put a truncated history in the new repo.
+
+### Why upstream's tags were left behind
+
+They would have added 24109 commits that are not on our history, plus 1252 dated
+snapshot tags cluttering the tag list our own `amiral-vX.Y` releases live in. Nothing
+needs them here: `sync-upstream.sh` adds the `upstream` remote and fetches tags from
+there. The consequence is that the tag named in `.spark-ems-upstream-tag` does not
+resolve in a fresh clone until you have fetched `upstream` once - which the sync script
+does automatically.
+
+## Dependabot is inherited and noisy
+
+rusEFI ships `.github/dependabot.yml` with a **daily** github-actions update schedule.
+It activated on the private repo within minutes of the mirror and opened branches for
+upstream's workflow pins.
+
+Turn it off in **Settings -> Code security -> Dependabot**, not by deleting the file:
+`.github/dependabot.yml` is an upstream file, and editing it creates a conflict on every
+future sync. Its PRs would be pure noise anyway - they bump action pins in workflows we
+do not run, and each one edits a shared upstream file.
+
 ## Remotes
 
 | Remote | URL | Purpose |
